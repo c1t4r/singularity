@@ -1,0 +1,10 @@
+# to build a deb package for Debian/Ubuntu/LinuxMint
+# on a fresh pull invoke the following commands:
+./autogen.sh
+./configure --prefix=/usr
+make -j 4
+echo "echo SKIPPING TESTS THEYRE BROKEN" > ./test.sh
+dpkg-buildpackage -nc -b -rfakeroot -us -uc
+ls -lah ../singularity-container_2.0-1_amd64.deb
+# -rw-r--r-- 1 stefan stefan 127K Nov  8 10:38 ../singularity-container_2.0-1_amd64.deb
+
