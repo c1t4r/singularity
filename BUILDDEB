@@ -3,7 +3,7 @@
 fakeroot dpkg-buildpackage -b -us -uc
 # ... will fail
 echo "echo SKIPPING TESTS THEYRE BROKEN" > ./test.sh
-fakeroot dpkg-buildpackage -nc -b -rfakeroot -us -uc
+fakeroot dpkg-buildpackage -nc -b -us -uc
 # ...will complete
 ls -lah ../singularity-container_2.0-1_amd64.deb
 # -rw-r--r-- 1 stefan stefan 127K Nov  8 10:38 ../singularity-container_2.0-1_amd64.deb
@@ -16,5 +16,5 @@ sudo dpkg -i ../singularity-container_2.0-1_amd64.deb
 
 # After the deb is installed the tests will work just fine
 # Run this then:
-dpkg-buildpackage -b -us -uc
+fakeroot dpkg-buildpackage -b -us -uc
 
