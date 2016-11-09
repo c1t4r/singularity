@@ -67,6 +67,7 @@ char *singularity_rootfs_dir(void) {
 
 int singularity_rootfs_init(char *source) {
     char *containername = basename(strdup(source));
+    int allow_group_containers = 0;
 
     singularity_message(DEBUG, "Checking on container source type\n");
 
@@ -85,6 +86,33 @@ int singularity_rootfs_init(char *source) {
     }
     singularity_message(DEBUG, "Set image mount path to: %s\n", mount_point);
 
+    singularity_config_rewind();
+    singularity_message(VERBOSE2, "Checking if we allow execution of root-owned containers not accessible by the calling user iff they share the group\n");
+    if ( singularity_config_get_bool("execute group containers", 0) == 0 ) {
+        singularity_message(VERBOSE2, "No, disabled by config\n");
+    } else {
+        singularity_message(VERBOSE2, "Enabled by config, checking prerequisites...\n");
+        if ( is_owner(source, 0) != 0 ) {
+            singularity_message(VERBOSE2, "Container is not owned by root\n");
+        } else {
+            singularity_message(VERBOSE2, "Container is owned by root\n");
+
+            int i;
+            for (i=0;i<singularity_priv_getgidcount();i++) {
+                if ( is_group(source, singularity_priv_getgids()[i]) == 0 ) {
+                    allow_group_containers = 1;
+                    break;
+                }
+            }
+
+            if (allow_group_containers) {
+                singularity_message(VERBOSE2, "The container is owned by a group of the user and can be accessed\n");
+            } else {
+                singularity_message(VERBOSE2, "The container is not owned by any group of the user and cannot be accessed\n");
+            }
+        }
+    }
+
     if ( is_file(source) == 0 ) {
         int len = strlength(source, PATH_MAX);
         if ( strcmp(&source[len - 5], ".sqsh") == 0 ) {
@@ -92,7 +120,7 @@ int singularity_rootfs_init(char *source) {
             return(rootfs_squashfs_init(source, joinpath(mount_point, ROOTFS_SOURCE)));
         } else { // Assume it is a standard Singularity image
             module = ROOTFS_IMAGE;
-            return(rootfs_image_init(source, joinpath(mount_point, ROOTFS_SOURCE)));
+            return(rootfs_image_init(source, joinpath(mount_point, ROOTFS_SOURCE),allow_group_containers));
         }
     } else if ( is_dir(source) == 0 ) {
         module = ROOTFS_DIR;

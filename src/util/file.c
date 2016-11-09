@@ -189,6 +189,21 @@ int is_owner(char *path, uid_t uid) {
     return(-1);
 }
 
+int is_group(char *path, uid_t gid) {
+    struct stat filestat;
+
+    // Stat path
+    if (stat(path, &filestat) < 0) {
+        return(-1);
+    }
+
+    if ( gid == (int)filestat.st_gid ) {
+        return(0);
+    }
+
+    return(-1);
+}
+
 int is_blk(char *path) {
     struct stat filestat;
 

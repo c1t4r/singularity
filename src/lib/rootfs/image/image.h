@@ -22,7 +22,7 @@
 #ifndef __ROOTFS_IMAGE_H_
 #define __ROOTFS_IMAGE_H_
 
-    int rootfs_image_init(char *source, char *mount_point);
+    int rootfs_image_init(char *source, char *mount_point, int allow_privileged_fopen);
     int rootfs_image_mount(void);
 
 #endif /* __ROOTFS_IMAGE_H */

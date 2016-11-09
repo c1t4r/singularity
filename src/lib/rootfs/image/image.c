@@ -48,7 +48,7 @@ static char *loop_dev = NULL;
 static int read_write = 0;
 
 
-int rootfs_image_init(char *source, char *mount_dir) {
+int rootfs_image_init(char *source, char *mount_dir, int allow_privileged_fopen) {
     singularity_message(DEBUG, "Inializing container rootfs image subsystem\n");
 
     if ( image_fp != NULL ) {
@@ -80,8 +80,21 @@ int rootfs_image_init(char *source, char *mount_dir) {
         read_write = 1;
     } else {
         if ( ( image_fp = fopen(source, "r") ) == NULL ) { // Flawfinder: ignore
-            singularity_message(ERROR, "Could not open image (read only) %s: %s\n", source, strerror(errno));
-            ABORT(255);
+            if (allow_privileged_fopen == 0) {
+                singularity_message(ERROR, "Could not open image (read only) %s: %s\n", source, strerror(errno));
+                ABORT(255);
+            } else {
+                singularity_message(VERBOSE, "Could not open image (read only), retrying with escalated privileges...\n");
+                singularity_priv_escalate();
+                if ( ( image_fp = fopen(source, "r") ) == NULL ) { 
+                    singularity_message(ERROR, "Could not open image even with escalated privileges...\n");
+                    singularity_priv_drop();
+                    ABORT(255);
+                } else {
+                    singularity_message(VERBOSE, "Success!\n");
+                    singularity_priv_drop();
+                }
+            }
         }
     }
 

@@ -28,6 +28,7 @@ int is_exec(char *path);
 int is_write(char *path);
 int is_suid(char *path);
 int is_owner(char *path, uid_t uid);
+int is_group(char *path, uid_t gid);
 int is_blk(char *path);
 int is_chr(char *path);
 int s_mkpath(char *dir, mode_t mode);
