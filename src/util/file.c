@@ -61,6 +61,28 @@ char *file_id(char *path) {
     return(ret);
 }
 
+int has_perm(int level, struct stat file_stat) {
+    int i;
+
+    if ( singularity_priv_getuid() == file_stat.st_uid ) {
+        if ( file_stat.st_mode & (level * 100) ) {
+          return(0);
+        }
+    }
+
+    for( i = 0; i < singularity_priv_getgidcount(); i++ ) {
+        if ( singularity_priv_getgids()[i] == file_stat.st_gid )
+            if ( file_stat.st_mode & (level * 10) ) {
+                return(0);
+            }
+    }
+
+    if ( file_stat.st_mode & (level * 1) ) {
+        return(0);
+    }
+
+    return(-1);
+}
 
 int is_file(char *path) {
     struct stat filestat;
