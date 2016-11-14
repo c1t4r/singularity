@@ -28,6 +28,7 @@
 #include <sys/mount.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <grp.h>
 
 #include "util/file.h"
 #include "util/util.h"
@@ -50,6 +51,10 @@ static int read_write = 0;
 
 int rootfs_image_init(char *source, char *mount_dir) {
     singularity_message(DEBUG, "Inializing container rootfs image subsystem\n");
+    struct group *file_grp;
+    struct group *config_grp;
+    struct stat image_stat;
+    char *config_gname;
 
     if ( image_fp != NULL ) {
         singularity_message(WARNING, "Called image_open, but image already open!\n");
@@ -79,9 +84,51 @@ int rootfs_image_init(char *source, char *mount_dir) {
         }
         read_write = 1;
     } else {
-        if ( ( image_fp = fopen(source, "r") ) == NULL ) { // Flawfinder: ignore
-            singularity_message(ERROR, "Could not open image (read only) %s: %s\n", source, strerror(errno));
-            ABORT(255);
+        if ( ( image_fp = fopen(source, "r") ) != NULL ) { // Flawfinder: ignore
+            singularity_message(VERBOSE2, "Image can be accessed by calling user\n");
+        } else {
+            singularity_message(VERBOSE2, "Image cannot be accessed by calling user, retrying with privileged mode and checking permissions...\n");
+            singularity_priv_escalate();
+            if ( ( image_fp = fopen(source, "r") ) == NULL ) { // Flawfinder: ignore
+                singularity_message(ERROR, "Could not open image (read only) %s: %s\n", source, strerror(errno));
+                ABORT(255);
+            }
+
+            if ( fstat(fileno(image_fp), &image_stat) != 0 ) {
+                singularity_message(ERROR, "Could not obtain stat on image %s: %s\n", source, strerror(errno));
+                ABORT(255);
+            }
+
+            if ( ( file_grp = getgrgid(image_stat.st_gid) ) == NULL ) {
+                singularity_message(ERROR, "Could not obtain gid of image %s: %s\n", source, strerror(errno));
+                ABORT(255);
+            }
+            singularity_priv_drop();
+
+            singularity_config_rewind();
+            do {
+                config_gname = singularity_config_get_value("container group");
+                if ( config_gname == NULL ) {
+                    singularity_message(ERROR, "Image is not a member of allowed container groups specified in config\n");
+                    ABORT(255);
+                } else {
+                    if ( (config_grp = getgrnam(config_gname)) == NULL ) {
+                        singularity_message(ERROR, "Container group %s declared but not found\n", config_gname);
+                        ABORT(255);
+                    } else {
+                        if (config_grp->gr_gid == file_grp->gr_gid) {
+                            singularity_message(VERBOSE2, "Container can be accessed by configured group %s\n", config_gname);
+                            if ( ( has_perm(4, image_stat) != 0 ) && ( has_perm(1, image_stat) != 0 ) ) {
+                                singularity_message(ERROR, "Calling user does not have proper permissions to access image, aborting...\n");
+                                ABORT(255);
+                            } else {
+                                break;
+                            }
+                        }
+                    }
+                }
+            } while( config_gname != NULL );
+            singularity_message(VERBOSE2, "Calling user has permissions to access image\n");
         }
     }
 
